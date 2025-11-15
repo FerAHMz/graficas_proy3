@@ -34,6 +34,20 @@ struct Spaceship {
     rotation_speed: f32,
 }
 
+impl Spaceship {
+    fn check_collision(&self, planet_pos: Vec3, planet_radius: f32) -> bool {
+        let distance = ((self.position.x - planet_pos.x).powi(2) +
+                       (self.position.y - planet_pos.y).powi(2) +
+                       (self.position.z - planet_pos.z).powi(2)).sqrt();
+        
+        // Radio de colisión de la nave (más grande para evitar acercarse demasiado)
+        let spaceship_radius = 1.5;
+        // Agregar margen de seguridad extra
+        let safety_margin = 1.0;
+        distance < (planet_radius + spaceship_radius + safety_margin)
+    }
+}
+
 fn create_model_matrix(translation: Vec3, scale: f32, rotation: Vec3) -> Mat4 {
     let (sin_x, cos_x) = rotation.x.sin_cos();
     let (sin_y, cos_y) = rotation.y.sin_cos();
@@ -79,7 +93,7 @@ fn create_view_matrix(eye: Vec3, center: Vec3, up: Vec3) -> Mat4 {
 fn create_perspective_matrix(window_width: f32, window_height: f32) -> Mat4 {
     let fov = 45.0 * PI / 180.0;
     let aspect_ratio = window_width / window_height;
-    let near = 0.1;
+    let near = 1.0;  // Aumentado a 1.0 para evitar ver el interior de planetas
     let far = 100.0;
 
     perspective(fov, aspect_ratio, near, far)
@@ -414,8 +428,34 @@ fn main() {
 
         let elapsed = start_time.elapsed().as_secs_f32();
 
+        // Guardar posición anterior para detectar colisiones
+        let old_position = spaceship.position;
+
         // Manejar controles de la nave
         handle_spaceship_controls(&window, &mut spaceship);
+
+        // Detectar colisiones con planetas
+        let mut collision_detected = false;
+        for planet in &planets {
+            let planet_pos = planet.get_current_position();
+            if spaceship.check_collision(planet_pos, planet.scale) {
+                collision_detected = true;
+                break;
+            }
+        }
+        
+        // Detectar colisiones con lunas
+        if !moons.is_empty() && planets.len() > 1 {
+            let moon_pos = moons[0].get_current_position();
+            if spaceship.check_collision(moon_pos, moons[0].scale) {
+                collision_detected = true;
+            }
+        }
+        
+        // Si hay colisión, revertir movimiento
+        if collision_detected {
+            spaceship.position = old_position;
+        }
 
         // Update planetary positions
         let delta_time = 0.016; // Assuming ~60 FPS
@@ -563,10 +603,10 @@ fn main() {
         }
         
         // RENDERIZAR LA NAVE
-        // Corrección de orientación del modelo
+        // Corrección de orientación del modelo - Spaceship.obj necesita rotación diferente a Jett.obj
         let spaceship_corrected_rotation = Vec3::new(
             spaceship.rotation.x + PI,  // Flip de 180° en X
-            spaceship.rotation.y,
+            spaceship.rotation.y - PI/2.0,  // Rotación de -90° en Y para Spaceship.obj
             spaceship.rotation.z
         );
         

@@ -14,16 +14,16 @@ pub fn vertex_shader(vertex: &Vertex, uniforms: &Uniforms) -> Vertex {
     // Apply transformations: Model -> View -> Projection
     let clip_position = uniforms.projection_matrix * uniforms.view_matrix * uniforms.model_matrix * position;
     
-    // Perspective divide with safety check
-    let ndc_position = if clip_position.w.abs() > 0.001 {
+    // Perspective divide with safety check - rechazar vértices detrás de la cámara
+    let ndc_position = if clip_position.w.abs() > 0.001 && clip_position.w > 0.0 {
         Vec3::new(
             clip_position.x / clip_position.w,
             clip_position.y / clip_position.w,
             clip_position.z / clip_position.w,
         )
     } else {
-        // Skip vertices that are too close or behind camera
-        Vec3::new(0.0, 0.0, -1.0)
+        // Skip vertices that are behind camera or too close
+        Vec3::new(0.0, 0.0, 10.0) // Fuera de la pantalla
     };
     
     // Apply viewport transformation

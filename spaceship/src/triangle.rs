@@ -18,6 +18,19 @@ pub fn triangle_with_shader(v1: &Vertex, v2: &Vertex, v3: &Vertex, shader_type: 
        !c.x.is_finite() || !c.y.is_finite() || !c.z.is_finite() {
         return fragments;
     }
+    
+    // Rechazar triángulos con vértices muy alejados (probablemente detrás de la cámara)
+    let screen_bounds = 3000.0; // Límite razonable para vértices en pantalla
+    if a.x.abs() > screen_bounds || a.y.abs() > screen_bounds ||
+       b.x.abs() > screen_bounds || b.y.abs() > screen_bounds ||
+       c.x.abs() > screen_bounds || c.y.abs() > screen_bounds {
+        return fragments;
+    }
+    
+    // Rechazar triángulos con profundidad negativa (detrás de la cámara)
+    if a.z < 0.0 || b.z < 0.0 || c.z < 0.0 {
+        return fragments;
+    }
 
     let (min_x, min_y, max_x, max_y) = calculate_bounding_box(&a, &b, &c);
     
