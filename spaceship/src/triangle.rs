@@ -12,10 +12,27 @@ pub fn triangle_with_shader(v1: &Vertex, v2: &Vertex, v3: &Vertex, shader_type: 
     let mut fragments = Vec::new();
     let (a, b, c) = (v1.transformed_position, v2.transformed_position, v3.transformed_position);
 
+    // Early rejection: skip if all vertices are NaN or Inf
+    if !a.x.is_finite() || !a.y.is_finite() || !a.z.is_finite() ||
+       !b.x.is_finite() || !b.y.is_finite() || !b.z.is_finite() ||
+       !c.x.is_finite() || !c.y.is_finite() || !c.z.is_finite() {
+        return fragments;
+    }
+
     let (min_x, min_y, max_x, max_y) = calculate_bounding_box(&a, &b, &c);
+    
+    // Skip if bounding box is degenerate
+    if min_x >= max_x || min_y >= max_y {
+        return fragments;
+    }
 
     let light_dir = Vec3::new(0.0, 0.0, -1.0);
     let triangle_area = edge_function(&a, &b, &c);
+    
+    // Skip if triangle has zero area
+    if triangle_area.abs() < 0.001 {
+        return fragments;
+    }
 
     // Iterate over each pixel in the bounding box
     for y in min_y..=max_y {
@@ -65,6 +82,12 @@ fn calculate_bounding_box(v1: &Vec3, v2: &Vec3, v3: &Vec3) -> (i32, i32, i32, i3
     let min_y = v1.y.min(v2.y).min(v3.y).floor() as i32;
     let max_x = v1.x.max(v2.x).max(v3.x).ceil() as i32;
     let max_y = v1.y.max(v2.y).max(v3.y).ceil() as i32;
+
+    // Clamp to reasonable screen bounds to prevent infinite loops
+    let min_x = min_x.max(0).min(800);
+    let min_y = min_y.max(0).min(600);
+    let max_x = max_x.max(0).min(800);
+    let max_y = max_y.max(0).min(600);
 
     (min_x, min_y, max_x, max_y)
 }

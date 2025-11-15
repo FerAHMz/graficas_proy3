@@ -1,4 +1,4 @@
-use nalgebra_glm::{Vec3, Mat4};
+use nalgebra_glm::{Vec2, Vec3, Vec4, Mat4, look_at, perspective};
 use minifb::{Key, Window, WindowOptions};
 use std::time::Duration;
 use std::f32::consts::PI;
@@ -12,6 +12,8 @@ mod fragment;
 mod shaders;
 mod sphere;
 mod planets;
+mod skybox;
+mod line;
 
 use framebuffer::Framebuffer;
 use vertex::Vertex;
@@ -19,6 +21,18 @@ use obj::Obj;
 use triangle::{triangle, triangle_with_shader};
 use shaders::{vertex_shader, Uniforms};
 use planets::{Planet, PlanetType, Moon, Ring};
+use skybox::Skybox;
+use color::Color;
+use line::line;
+
+// Estructura para la nave espacial
+struct Spaceship {
+    position: Vec3,
+    rotation: Vec3,  // (pitch, yaw, roll)
+    scale: f32,
+    speed: f32,
+    rotation_speed: f32,
+}
 
 fn create_model_matrix(translation: Vec3, scale: f32, rotation: Vec3) -> Mat4 {
     let (sin_x, cos_x) = rotation.x.sin_cos();
@@ -56,6 +70,109 @@ fn create_model_matrix(translation: Vec3, scale: f32, rotation: Vec3) -> Mat4 {
     );
 
     transform_matrix * rotation_matrix
+}
+
+fn create_view_matrix(eye: Vec3, center: Vec3, up: Vec3) -> Mat4 {
+    look_at(&eye, &center, &up)
+}
+
+fn create_perspective_matrix(window_width: f32, window_height: f32) -> Mat4 {
+    let fov = 45.0 * PI / 180.0;
+    let aspect_ratio = window_width / window_height;
+    let near = 0.1;
+    let far = 100.0;
+
+    perspective(fov, aspect_ratio, near, far)
+}
+
+fn create_viewport_matrix(width: f32, height: f32) -> Mat4 {
+    Mat4::new(
+        width / 2.0, 0.0, 0.0, width / 2.0,
+        0.0, -height / 2.0, 0.0, height / 2.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    )
+}
+
+fn draw_orbit(
+    framebuffer: &mut Framebuffer,
+    center: Vec3,
+    radius: f32,
+    segments: u32,
+    color: Color,
+    view_matrix: &Mat4,
+    projection_matrix: &Mat4,
+    viewport_matrix: &Mat4,
+) {
+    let mvp = projection_matrix * view_matrix;
+    
+    for i in 0..segments {
+        let angle1 = (i as f32 / segments as f32) * 2.0 * PI;
+        let angle2 = ((i + 1) as f32 / segments as f32) * 2.0 * PI;
+        
+        let p1 = Vec3::new(
+            center.x + radius * angle1.cos(),
+            center.y,
+            center.z + radius * angle1.sin()
+        );
+        let p2 = Vec3::new(
+            center.x + radius * angle2.cos(),
+            center.y,
+            center.z + radius * angle2.sin()
+        );
+        
+        let p1_clip = mvp * Vec4::new(p1.x, p1.y, p1.z, 1.0);
+        let p2_clip = mvp * Vec4::new(p2.x, p2.y, p2.z, 1.0);
+        
+        if p1_clip.w.abs() < 0.001 || p2_clip.w.abs() < 0.001 {
+            continue;
+        }
+        
+        let p1_ndc = Vec3::new(
+            p1_clip.x / p1_clip.w,
+            p1_clip.y / p1_clip.w,
+            p1_clip.z / p1_clip.w
+        );
+        let p2_ndc = Vec3::new(
+            p2_clip.x / p2_clip.w,
+            p2_clip.y / p2_clip.w,
+            p2_clip.z / p2_clip.w
+        );
+        
+        if p1_ndc.x.abs() > 2.0 || p1_ndc.y.abs() > 2.0 || 
+           p2_ndc.x.abs() > 2.0 || p2_ndc.y.abs() > 2.0 ||
+           p1_clip.w < 0.0 || p2_clip.w < 0.0 {
+            continue;
+        }
+        
+        let viewport = viewport_matrix;
+        let p1_screen = viewport * Vec4::new(p1_ndc.x, p1_ndc.y, p1_ndc.z, 1.0);
+        let p2_screen = viewport * Vec4::new(p2_ndc.x, p2_ndc.y, p2_ndc.z, 1.0);
+        
+        if p1_screen.x.is_nan() || p1_screen.y.is_nan() || 
+           p2_screen.x.is_nan() || p2_screen.y.is_nan() {
+            continue;
+        }
+        
+        let v1 = Vertex {
+            position: p1,
+            normal: Vec3::new(0.0, 1.0, 0.0),
+            tex_coords: Vec2::new(0.0, 0.0),
+            color: color.clone(),
+            transformed_position: Vec3::new(p1_screen.x, p1_screen.y, p1_screen.z),
+            transformed_normal: Vec3::new(0.0, 1.0, 0.0),
+        };
+        let v2 = Vertex {
+            position: p2,
+            normal: Vec3::new(0.0, 1.0, 0.0),
+            tex_coords: Vec2::new(0.0, 0.0),
+            color: color.clone(),
+            transformed_position: Vec3::new(p2_screen.x, p2_screen.y, p2_screen.z),
+            transformed_normal: Vec3::new(0.0, 1.0, 0.0),
+        };
+        
+        line(&v1, &v2, framebuffer);
+    }
 }
 
 fn render(framebuffer: &mut Framebuffer, uniforms: &Uniforms, vertex_array: &[Vertex]) {
@@ -100,16 +217,57 @@ fn render_with_shader(framebuffer: &mut Framebuffer, uniforms: &Uniforms, vertex
     }
 }
 
+fn handle_spaceship_controls(window: &Window, spaceship: &mut Spaceship) {
+    let yaw = spaceship.rotation.y;
+    let pitch = spaceship.rotation.x;
+    
+    // Movimiento adelante/atrás basado en la dirección YAW
+    if window.is_key_down(Key::W) {
+        spaceship.position.x += yaw.sin() * spaceship.speed;
+        spaceship.position.z += yaw.cos() * spaceship.speed;
+    }
+    if window.is_key_down(Key::S) {
+        spaceship.position.x -= yaw.sin() * spaceship.speed;
+        spaceship.position.z -= yaw.cos() * spaceship.speed;
+    }
+    
+    // Rotación horizontal (YAW)
+    if window.is_key_down(Key::A) {
+        spaceship.rotation.y += spaceship.rotation_speed;
+    }
+    if window.is_key_down(Key::D) {
+        spaceship.rotation.y -= spaceship.rotation_speed;
+    }
+    
+    // Inclinación (PITCH) - Limitado a ±30 grados
+    if window.is_key_down(Key::Up) {
+        spaceship.rotation.x += spaceship.rotation_speed * 0.5;
+        spaceship.rotation.x = spaceship.rotation.x.min(PI / 6.0);  // Max 30°
+    }
+    if window.is_key_down(Key::Down) {
+        spaceship.rotation.x -= spaceship.rotation_speed * 0.5;
+        spaceship.rotation.x = spaceship.rotation.x.max(-PI / 6.0); // Min -30°
+    }
+    
+    // Movimiento vertical
+    if window.is_key_down(Key::Q) {
+        spaceship.position.y += spaceship.speed;
+    }
+    if window.is_key_down(Key::E) {
+        spaceship.position.y -= spaceship.speed;
+    }
+}
+
 fn main() {
     let window_width = 800;
-    let window_height = 600;
+    let window_height = 800;
     let framebuffer_width = 800;
-    let framebuffer_height = 600;
+    let framebuffer_height = 800;
     let frame_delay = Duration::from_millis(16);
 
     let mut framebuffer = Framebuffer::new(framebuffer_width, framebuffer_height);
     let mut window = Window::new(
-        "Solar System Renderer - Creative Planetary Shaders",
+        "Solar System Renderer - Camera Following Spaceship",
         window_width,
         window_height,
         WindowOptions::default(),
@@ -120,18 +278,34 @@ fn main() {
     window.update();
 
     // Set background color to deep space
-    framebuffer.set_background_color(0x000011);
+    framebuffer.set_background_color(0x000000);
+    
+    // Crear skybox con estrellas
+    let skybox = Skybox::new(800);
+
+    // Cargar modelo de la nave
+    let spaceship_obj = Obj::load("assets/Spaceship.obj").expect("Error cargando modelo de nave");
+    let spaceship_vertices = spaceship_obj.get_vertex_array();
+
+    // Inicializar la nave espacial
+    let mut spaceship = Spaceship {
+        position: Vec3::new(0.0, 8.0, 35.0),  // Igual que el proyecto de referencia
+        rotation: Vec3::new(0.0, PI, 0.0),    // Mirando hacia -Z
+        scale: 0.08,  // Escala pequeña como en referencia
+        speed: 0.15,  // Velocidad de referencia
+        rotation_speed: 0.03,  // Velocidad de rotación de referencia
+    };
 
     // Create planetary system for maximum points
     let mut planets = Vec::new();
     let mut moons = Vec::new();
     let mut rings = Vec::new();
 
-    // Sun (Star) - Center of the system
+    // Sun (Star) - Center of the system (ahora en coordenadas 3D)
     planets.push(Planet::new(
         PlanetType::Star,
-        Vec3::new(400.0, 300.0, 0.0), // Center of screen
-        60.0, // Large size
+        Vec3::new(0.0, 0.0, 0.0), // Centro del sistema en 3D
+        2.0, // Escala del sol (como referencia)
         0.5,  // Slow rotation
         0.0,  // No orbital motion (it's the center)
         0.0,
@@ -140,80 +314,78 @@ fn main() {
     // Rocky Planet (Earth-like) with moon
     planets.push(Planet::new(
         PlanetType::RockyPlanet,
-        Vec3::new(400.0, 300.0, 0.0),
-        25.0,
+        Vec3::new(0.0, 0.0, 0.0),
+        0.8,  // Escala reducida
         2.0,  // Rotation
-        1.0,  // Orbital speed
-        120.0, // Orbital radius
+        0.5,  // Orbital speed
+        8.0,  // Orbital radius (como referencia)
     ));
 
     // Moon for the rocky planet
     moons.push(Moon::new(
         Vec3::new(0.0, 0.0, 0.0), // Will be updated
-        40.0, // Orbital radius around planet
-        3.0,  // Fast orbital speed
-        8.0,  // Small size
+        1.5,  // Orbital radius around planet (como referencia)
+        2.0,  // Fast orbital speed
+        0.3,  // Small size (como referencia)
     ));
 
     // Gas Giant with rings
     planets.push(Planet::new(
         PlanetType::GasGiant,
-        Vec3::new(400.0, 300.0, 0.0),
-        45.0, // Planet radius = 45 units
+        Vec3::new(0.0, 0.0, 0.0),
+        1.5,  // Escala reducida
         1.5,
-        0.7,
-        200.0,
+        0.3,  // Orbital speed
+        15.0, // Orbital radius (como referencia)
     ));
 
     // Rings for gas giant - proper spacing from planet surface
-    // Gas Giant radius = 45, so rings start at ~70 (25 units gap)
-    rings.push(Ring::new(90.0, 140.0, 128)); // Main ring system 
-    rings.push(Ring::new(150.0, 180.0, 96)); // Outer ring (10 unit gap)
-    rings.push(Ring::new(70.0, 85.0, 96));   // Inner ring (closest to planet)
+    rings.push(Ring::new(2.0, 2.5, 128)); // Main ring system 
+    rings.push(Ring::new(2.6, 3.0, 96));  // Outer ring
+    rings.push(Ring::new(1.8, 1.95, 96)); // Inner ring
 
     // Extra planets for bonus points
     // Ice Planet
     planets.push(Planet::new(
         PlanetType::IcePlanet,
-        Vec3::new(400.0, 300.0, 0.0),
-        20.0,
+        Vec3::new(0.0, 0.0, 0.0),
+        0.6,  // Escala reducida
         1.0,
-        0.5,
-        280.0,
+        0.2,  // Orbital speed
+        22.0, // Orbital radius (como referencia)
     ));
 
     // Volcanic Planet
     planets.push(Planet::new(
         PlanetType::VolcanicPlanet,
-        Vec3::new(400.0, 300.0, 0.0),
-        18.0,
+        Vec3::new(0.0, 0.0, 0.0),
+        0.5,  // Escala reducida
         3.0,
         1.5,
-        80.0, // Close to the sun
+        5.0,  // Close to the sun (reducido)
     ));
 
     // Ringed Planet (Saturn-like)
     planets.push(Planet::new(
         PlanetType::RingedPlanet,
-        Vec3::new(400.0, 300.0, 0.0),
-        35.0, // Planet radius = 35 units  
+        Vec3::new(0.0, 0.0, 0.0),
+        1.2,  // Escala reducida
         1.2,
         0.4,
-        320.0,
+        28.0, // Orbital radius (reducido)
     ));
 
     // Rings for ringed planet - Saturn-like with proper spacing  
-    // Ringed Planet radius = 35, so rings start at ~65 (30 units gap)
-    rings.push(Ring::new(80.0, 120.0, 128));  // Main A ring
-    rings.push(Ring::new(130.0, 160.0, 96));  // B ring (10 unit gap)
-    rings.push(Ring::new(65.0, 75.0, 64));    // Inner C ring (closest to planet)
+    rings.push(Ring::new(1.7, 2.2, 128));  // Main A ring
+    rings.push(Ring::new(2.3, 2.8, 96));   // B ring
+    rings.push(Ring::new(1.5, 1.65, 64));  // Inner C ring
 
     let start_time = std::time::Instant::now();
-    let mut current_planet = 0; // For cycling through planets
     
     println!("🌟 SOLAR SYSTEM RENDERER 🌟");
     println!("=====================================");
-    println!("Features implemented for maximum score:");
+    println!("Features implemented:");
+    println!("✓ Camera following spaceship in 3rd person");
     println!("✓ Star (Sun) - 4-layer fire shader");
     println!("✓ Rocky Planet - 4-layer Earth-like shader");
     println!("✓ Gas Giant - 4-layer Jupiter-like shader");
@@ -223,17 +395,17 @@ fn main() {
     println!("✓ Moon system - orbiting rocky planet");
     println!("✓ Ring systems - around gas giants");
     println!("=====================================");
-    println!("Controls:");
-    println!("• Arrow Keys: Navigate camera");
-    println!("• S/A: Zoom in/out");
-    println!("• 1-6: Focus on different planets");
-    println!("• SPACE: Toggle auto-rotation");
+    println!("SPACESHIP CONTROLS:");
+    println!("• W/S: Forward/Backward");
+    println!("• A/D: Rotate left/right");
+    println!("• Arrow Up/Down: Pitch up/down");
+    println!("• Q/E: Move up/down");
     println!("• ESC: Exit");
     println!("=====================================");
 
-    let mut camera_position = Vec3::new(400.0, 300.0, 0.0);
-    let mut camera_scale = 1.0;
-    let mut auto_rotate = true;
+    // Crear matrices de proyección y viewport
+    let projection_matrix = create_perspective_matrix(window_width as f32, window_height as f32);
+    let viewport_matrix = create_viewport_matrix(framebuffer_width as f32, framebuffer_height as f32);
 
     while window.is_open() {
         if window.is_key_down(Key::Escape) {
@@ -242,8 +414,8 @@ fn main() {
 
         let elapsed = start_time.elapsed().as_secs_f32();
 
-        // Handle input
-        handle_input(&window, &mut camera_position, &mut camera_scale, &mut current_planet, &mut auto_rotate, &planets);
+        // Manejar controles de la nave
+        handle_spaceship_controls(&window, &mut spaceship);
 
         // Update planetary positions
         let delta_time = 0.016; // Assuming ~60 FPS
@@ -259,20 +431,93 @@ fn main() {
             }
         }
 
+        // CÁMARA EN TERCERA PERSONA SIGUIENDO LA NAVE
+        let camera_distance = 2.5;   // Distancia de referencia
+        let camera_height = 0.8;     // Altura de referencia
+        let yaw = spaceship.rotation.y;
+        
+        // Calcular posición de cámara DETRÁS de la nave
+        let camera_position = Vec3::new(
+            spaceship.position.x - yaw.sin() * camera_distance,
+            spaceship.position.y + camera_height,
+            spaceship.position.z - yaw.cos() * camera_distance
+        );
+        
+        // Crear view matrix: cámara mira hacia la nave
+        let view_matrix = create_view_matrix(
+            camera_position,
+            spaceship.position,
+            Vec3::new(0.0, 1.0, 0.0)  // Vector UP
+        );
+
         framebuffer.clear();
+        
+        // Renderizar skybox con estrellas
+        skybox.render(&mut framebuffer);
+        
+        // Dibujar órbitas de los planetas
+        draw_orbit(
+            &mut framebuffer,
+            Vec3::new(0.0, 0.0, 0.0),
+            8.0,
+            100,
+            Color::new(0, 255, 100),
+            &view_matrix,
+            &projection_matrix,
+            &viewport_matrix
+        );
+        
+        draw_orbit(
+            &mut framebuffer,
+            Vec3::new(0.0, 0.0, 0.0),
+            15.0,
+            120,
+            Color::new(200, 100, 255),
+            &view_matrix,
+            &projection_matrix,
+            &viewport_matrix
+        );
+        
+        draw_orbit(
+            &mut framebuffer,
+            Vec3::new(0.0, 0.0, 0.0),
+            22.0,
+            140,
+            Color::new(100, 200, 255),
+            &view_matrix,
+            &projection_matrix,
+            &viewport_matrix
+        );
+        
+        // Órbita del planeta anillado (más externa)
+        draw_orbit(
+            &mut framebuffer,
+            Vec3::new(0.0, 0.0, 0.0),
+            28.0,
+            160,
+            Color::new(150, 255, 150),
+            &view_matrix,
+            &projection_matrix,
+            &viewport_matrix
+        );
 
         // Render all planets
         for (i, planet) in planets.iter().enumerate() {
             let translation = planet.get_current_position();
             let rotation = Vec3::new(0.0, planet.current_rotation, 0.0);
-            let scale = planet.scale * camera_scale;
+            let scale = planet.scale;
 
             let model_matrix = create_model_matrix(
-                translation + camera_position - Vec3::new(400.0, 300.0, 0.0),
+                translation,
                 scale,
                 rotation
             );
-            let uniforms = Uniforms { model_matrix };
+            let uniforms = Uniforms { 
+                model_matrix,
+                view_matrix,
+                projection_matrix,
+                viewport_matrix,
+            };
 
             render_with_shader(
                 &mut framebuffer,
@@ -284,18 +529,16 @@ fn main() {
 
             // Render rings if this is a gas giant or ringed planet
             if matches!(planet.planet_type, PlanetType::GasGiant) && i == 2 && rings.len() >= 3 {
-                let ring_translation = translation + camera_position - Vec3::new(400.0, 300.0, 0.0);
                 // Render multiple rings for gas giant
-                render_ring(&mut framebuffer, &rings[0], ring_translation, camera_scale * planet.scale, elapsed);
-                render_ring(&mut framebuffer, &rings[1], ring_translation, camera_scale * planet.scale, elapsed);
-                render_ring(&mut framebuffer, &rings[2], ring_translation, camera_scale * planet.scale, elapsed);
+                render_ring(&mut framebuffer, &rings[0], translation, planet.scale, elapsed, &view_matrix, &projection_matrix, &viewport_matrix);
+                render_ring(&mut framebuffer, &rings[1], translation, planet.scale, elapsed, &view_matrix, &projection_matrix, &viewport_matrix);
+                render_ring(&mut framebuffer, &rings[2], translation, planet.scale, elapsed, &view_matrix, &projection_matrix, &viewport_matrix);
             }
             if matches!(planet.planet_type, PlanetType::RingedPlanet) && rings.len() >= 6 {
-                let ring_translation = translation + camera_position - Vec3::new(400.0, 300.0, 0.0);
                 // Render multiple rings for ringed planet (Saturn-like)
-                render_ring(&mut framebuffer, &rings[3], ring_translation, camera_scale * planet.scale, elapsed);
-                render_ring(&mut framebuffer, &rings[4], ring_translation, camera_scale * planet.scale, elapsed);
-                render_ring(&mut framebuffer, &rings[5], ring_translation, camera_scale * planet.scale, elapsed);
+                render_ring(&mut framebuffer, &rings[3], translation, planet.scale, elapsed, &view_matrix, &projection_matrix, &viewport_matrix);
+                render_ring(&mut framebuffer, &rings[4], translation, planet.scale, elapsed, &view_matrix, &projection_matrix, &viewport_matrix);
+                render_ring(&mut framebuffer, &rings[5], translation, planet.scale, elapsed, &view_matrix, &projection_matrix, &viewport_matrix);
             }
         }
 
@@ -303,16 +546,42 @@ fn main() {
         if !moons.is_empty() && planets.len() > 1 {
             let moon_pos = moons[0].get_current_position();
             let model_matrix = create_model_matrix(
-                moon_pos + camera_position - Vec3::new(400.0, 300.0, 0.0),
-                moons[0].scale * camera_scale,
+                moon_pos,
+                moons[0].scale,
                 Vec3::new(0.0, 0.0, 0.0)
             );
-            let uniforms = Uniforms { model_matrix };
+            let uniforms = Uniforms { 
+                model_matrix,
+                view_matrix,
+                projection_matrix,
+                viewport_matrix,
+            };
 
             // Use a simple gray color for moon
             framebuffer.set_current_color(0xAAAAA0);
             render(&mut framebuffer, &uniforms, moons[0].sphere.get_vertex_array());
         }
+        
+        // RENDERIZAR LA NAVE
+        // Corrección de orientación del modelo
+        let spaceship_corrected_rotation = Vec3::new(
+            spaceship.rotation.x + PI,  // Flip de 180° en X
+            spaceship.rotation.y,
+            spaceship.rotation.z
+        );
+        
+        let spaceship_model_matrix = create_model_matrix(
+            spaceship.position,
+            spaceship.scale,
+            spaceship_corrected_rotation
+        );
+        let spaceship_uniforms = Uniforms {
+            model_matrix: spaceship_model_matrix,
+            view_matrix,
+            projection_matrix,
+            viewport_matrix,
+        };
+        render(&mut framebuffer, &spaceship_uniforms, &spaceship_vertices);
 
         window
             .update_with_buffer(&framebuffer.buffer, framebuffer_width, framebuffer_height)
@@ -322,7 +591,7 @@ fn main() {
     }
 }
 
-fn render_ring(framebuffer: &mut Framebuffer, ring: &Ring, center: Vec3, scale: f32, time: f32) {
+fn render_ring(framebuffer: &mut Framebuffer, ring: &Ring, center: Vec3, scale: f32, time: f32, view_matrix: &Mat4, projection_matrix: &Mat4, viewport_matrix: &Mat4) {
     // Set ring color - make it more visible
     framebuffer.set_current_color(0xDDDDEE);
     
@@ -330,89 +599,13 @@ fn render_ring(framebuffer: &mut Framebuffer, ring: &Ring, center: Vec3, scale: 
     let ring_scale = scale * 0.012; // Adjust scale to be more visible
     let rotation = Vec3::new(75.0_f32.to_radians(), time * 0.2, 0.0); // Slight tilt and slow rotation
     let model_matrix = create_model_matrix(center, ring_scale, rotation);
-    let uniforms = Uniforms { model_matrix };
+    let uniforms = Uniforms { 
+        model_matrix,
+        view_matrix: *view_matrix,
+        projection_matrix: *projection_matrix,
+        viewport_matrix: *viewport_matrix,
+    };
     
     // Render the ring
     render(framebuffer, &uniforms, &ring.vertices);
-}fn handle_input(
-    window: &Window, 
-    camera_position: &mut Vec3, 
-    camera_scale: &mut f32, 
-    current_planet: &mut usize,
-    auto_rotate: &mut bool,
-    planets: &[Planet]
-) {
-    // Camera movement
-    if window.is_key_down(Key::Right) {
-        camera_position.x -= 10.0;
-    }
-    if window.is_key_down(Key::Left) {
-        camera_position.x += 10.0;
-    }
-    if window.is_key_down(Key::Up) {
-        camera_position.y += 10.0;
-    }
-    if window.is_key_down(Key::Down) {
-        camera_position.y -= 10.0;
-    }
-    
-    // Zoom
-    if window.is_key_down(Key::S) {
-        *camera_scale += 0.05;
-    }
-    if window.is_key_down(Key::A) {
-        *camera_scale -= 0.05;
-        if *camera_scale < 0.1 {
-            *camera_scale = 0.1;
-        }
-    }
-    
-    // Planet selection (1-6 keys)
-    if window.is_key_down(Key::Key1) {
-        *current_planet = 0;
-        focus_on_planet(camera_position, planets, 0);
-    }
-    if window.is_key_down(Key::Key2) && planets.len() > 1 {
-        *current_planet = 1;
-        focus_on_planet(camera_position, planets, 1);
-    }
-    if window.is_key_down(Key::Key3) && planets.len() > 2 {
-        *current_planet = 2;
-        focus_on_planet(camera_position, planets, 2);
-    }
-    if window.is_key_down(Key::Key4) && planets.len() > 3 {
-        *current_planet = 3;
-        focus_on_planet(camera_position, planets, 3);
-    }
-    if window.is_key_down(Key::Key5) && planets.len() > 4 {
-        *current_planet = 4;
-        focus_on_planet(camera_position, planets, 4);
-    }
-    if window.is_key_down(Key::Key6) && planets.len() > 5 {
-        *current_planet = 5;
-        focus_on_planet(camera_position, planets, 5);
-    }
-    
-    // Toggle auto-rotation
-    if window.is_key_down(Key::Space) {
-        *auto_rotate = !*auto_rotate;
-        std::thread::sleep(Duration::from_millis(200)); // Prevent rapid toggling
-    }
-}
-
-fn focus_on_planet(camera_position: &mut Vec3, planets: &[Planet], index: usize) {
-    if index < planets.len() {
-        let planet_pos = planets[index].get_current_position();
-        *camera_position = Vec3::new(400.0, 300.0, 0.0) - planet_pos;
-        println!("Focusing on planet {}: {:?}", index + 1, 
-            match planets[index].planet_type {
-                PlanetType::Star => "Star (Sun)",
-                PlanetType::RockyPlanet => "Rocky Planet (Earth-like)",
-                PlanetType::GasGiant => "Gas Giant (Jupiter-like)",
-                PlanetType::IcePlanet => "Ice Planet",
-                PlanetType::VolcanicPlanet => "Volcanic Planet",
-                PlanetType::RingedPlanet => "Ringed Planet (Saturn-like)",
-            }
-        );
-    }
 }
