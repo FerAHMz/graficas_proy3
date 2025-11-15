@@ -1,120 +1,139 @@
-# 🌟 Solar System Renderer - Creative Planetary Shaders
+# 🌟 Solar System Renderer - Third Person Camera Following Spaceship
 
 ## 📋 Descripción del Proyecto
 
-Este proyecto implementa un **sistema solar completo** con renderizado 3D por software, utilizando **shaders creativos de 4 capas** para crear planetas únicos y realistas. El proyecto está desarrollado en **Rust** y utiliza rasterización manual de triángulos para mostrar un sistema solar dinámico con múltiples planetas, lunas y sistemas de anillos.
+Este proyecto implementa un **sistema solar completo en 3D** con una **nave espacial navegable** en cámara de tercera persona. Desarrollado completamente en **Rust** utilizando rasterización por software, incluye **6 planetas únicos con shaders de 4 capas**, sistema de colisiones, skybox con estrellas procedurales, y visualización de órbitas planetarias.
 
-![Planetas Renderizados](./assets/images/Planetas%20renderizados.png)
-_Sistema solar completo con 6 planetas únicos y shaders de 4 capas_
+![Space Travel](./assets/images/SpaceTravel.png)
+_Sistema solar con nave espacial y cámara en tercera persona_
 
-## 🎯 Objetivos del Laboratorio
+### 🎥 Video Demostración
 
-El objetivo principal es **practicar la creación de shaders interesantes utilizando únicamente variación de colores**, sin texturas ni materiales externos. Se implementaron:
+[![Ver Video](https://img.shields.io/badge/▶️_Ver_Demostración-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtube.com/shorts/oqt8Yi3YNjQ)
 
-- ✅ **Estrella (Sol)** que sirve como centro del sistema solar
-- ✅ **Planeta Rocoso** tipo Tierra con sistema de luna orbital
-- ✅ **Gigante Gaseoso** tipo Júpiter con sistema de anillos
-- ✅ **3 Planetas EXTRAS** para puntos bonus
-- ✅ **Sistemas de anillos** en planetas gaseosos
-- ✅ **Sistema de luna** orbitando el planeta rocoso
+## 🎯 Características Principales
 
-## 🌍 Planetas Implementados
+### 🚀 **Sistema de Cámara y Nave (40 puntos)**
 
-### 1. ☀️ **Estrella (Sol)** - Shader de 4 Capas
+- **Cámara en tercera persona** siguiendo la nave espacial
+- **Movimiento 3D completo**: adelante/atrás, rotación, pitch, subir/bajar
+- **Nave modelada en 3D** cargada desde archivo OBJ
+- **Controles intuitivos** con teclado (WASD, flechas, Q/E)
 
-- **Capa 1**: Gradiente de temperatura del núcleo
-- **Capa 2**: Turbulencia de plasma animada
-- **Capa 3**: Llamaradas solares dinámicas
-- **Capa 4**: Efecto de corona exterior
+### 🌌 **Skybox y Ambiente (10 puntos)**
 
-### 2. 🌍 **Planeta Rocoso (Tipo Tierra)** - Shader de 4 Capas
+- **800 estrellas procedurales** con diferentes niveles de brillo
+- **Distribución realista** de estrellas en todo el cielo
+- **Estrellas brillantes con halo** para mayor realismo
 
-- **Capa 1**: Masas continentales procedurales
-- **Capa 2**: Profundidad oceánica variable
-- **Capa 3**: Cobertura de nubes animada
-- **Capa 4**: Casquetes polares de hielo
+### 🛡️ **Sistema de Colisiones (10 puntos)**
 
-### 3. 🪐 **Gigante Gaseoso (Tipo Júpiter)** - Shader de 4 Capas
+- **Detección de colisiones** con todos los planetas y lunas
+- **Radio de seguridad** de 2.5 unidades alrededor de cada cuerpo celeste
+- **Prevención de atravesar objetos** - la nave se detiene al colisionar
 
-- **Capa 1**: Bandas atmosféricas características
-- **Capa 2**: Sistemas de tormentas dinámicas
-- **Capa 3**: Gran Mancha Roja equivalente
-- **Capa 4**: Turbulencia atmosférica animada
+### 🪐 **Órbitas Planetarias (20 puntos)**
 
-### 4. 🧊 **Planeta Helado** (EXTRA) - Shader de 4 Capas
+- **4 órbitas visualizadas** con diferentes colores:
+  - Verde: Planeta Rocoso (radio 8.0)
+  - Púrpura: Gigante Gaseoso (radio 15.0)
+  - Azul Cian: Planeta de Hielo (radio 22.0)
+  - Verde Claro: Planeta Anillado (radio 28.0)
+- **Líneas procedurales** renderizadas en tiempo real
 
-- **Capa 1**: Formaciones de cristales de hielo
-- **Capa 2**: Grietas de océano congelado
-- **Capa 3**: Resplandor subsuperficial tipo aurora
-- **Capa 4**: Variación de escarcha superficial
+### 🌍 **6 Planetas Únicos (50 puntos)**
 
-### 5. 🌋 **Planeta Volcánico** (EXTRA) - Shader de 4 Capas
+1. **☀️ Sol** (2.0 unidades) - Shader de fuego de 4 capas
+2. **🌍 Planeta Rocoso** (0.8 unidades) - Con luna orbital
+3. **🪐 Gigante Gaseoso** (1.5 unidades) - Con sistema de anillos
+4. **🧊 Planeta de Hielo** (0.6 unidades) - Mundo congelado
+5. **🌋 Planeta Volcánico** (0.5 unidades) - Cerca del sol
+6. **🪐 Planeta Anillado** (1.2 unidades) - Tipo Saturno
 
-- **Capa 1**: Flujos de lava animados
-- **Capa 2**: Formaciones rocosas volcánicas
-- **Capa 3**: Erupciones volcánicas activas
-- **Capa 4**: Nubes de ceniza y humo
+## 🎮 Controles
 
-### 6. 🪐 **Planeta Anillado (Tipo Saturno)** (EXTRA) - Shader de 4 Capas
+### **Navegación de la Nave**
 
-- **Capa 1**: Bandas atmosféricas planetarias
-- **Capa 2**: Tormenta polar hexagonal
-- **Capa 3**: Patrones de viento atmosféricos
-- **Capa 4**: Colores de composición atmosférica
+- `W` - Mover hacia adelante
+- `S` - Mover hacia atrás
+- `A` - Rotar a la izquierda
+- `D` - Rotar a la derecha
+- `Flecha Arriba` - Inclinar hacia arriba (pitch)
+- `Flecha Abajo` - Inclinar hacia abajo (pitch)
+- `Q` - Subir verticalmente
+- `E` - Bajar verticalmente
+- `ESC` - Salir del programa
 
-## 🚀 Características Implementadas
+### **Características de la Cámara**
 
-### 📊 **Puntuación Máxima Obtenida**
+- Distancia fija de 2.5 unidades detrás de la nave
+- Altura de 0.8 unidades sobre la nave
+- Sigue automáticamente la rotación de la nave
+- Vista clara del sistema solar desde la perspectiva de la nave
 
-- **Criterio Subjetivo**: 30/30 pts - Diseño creativo del sistema solar
-- **Complejidad de Shaders**: 40/40 pts - Todos los planetas con 4 capas
-- **Planetas EXTRAS**: 30/30 pts - 3 planetas adicionales implementados
-- **Sistema de Anillos**: 20/20 pts - Anillos en gigantes gaseosos
-- **Luna en Planeta Rocoso**: 20/20 pts - Sistema lunar orbital
-- **🏆 Total: 140+ puntos**
+## 📊 Puntuación Total
 
-### 🎮 **Sistema de Controles Avanzado**
-
-- **Teclas 1-6**: Enfoque automático en diferentes planetas
-- **Flechas direccionales**: Navegación libre de cámara
-- **S/A**: Sistema de zoom dinámico
-- **SPACE**: Toggle de auto-rotación planetaria
-- **ESC**: Salir del programa
-
-### 🌌 **Sistemas Físicos Implementados**
-
-- **Movimiento orbital realista** con diferentes velocidades
-- **Rotación planetaria** individual para cada cuerpo
-- **Sistema lunar orbital** alrededor del planeta rocoso
-- **Sistemas de anillos múltiples** con espaciado realista
-- **Animaciones temporales** en todos los shaders
+- **[30 pts]** Estética del sistema completo
+- **[20 pts]** Performance apropiado de la escena
+- **[50 pts]** 6 planetas/estrellas/lunas únicos (10 pts c/u)
+- **[30 pts]** Nave modelada siguiendo la cámara
+- **[10 pts]** Skybox con estrellas en el horizonte
+- **[10 pts]** Sistema de colisiones implementado
+- **[40 pts]** Movimiento 3D completo de la cámara
+- **[20 pts]** Renderizado de órbitas planetarias
+- **🏆 Total: 210 puntos**
 
 ## 🛠️ Implementación Técnica
 
-### **Estructura del Código**
+### **Arquitectura del Proyecto**
 
-- `main.rs`: Sistema principal y bucle de renderizado
-- `planets.rs`: Definición de planetas y shaders de 4 capas
-- `sphere.rs`: Generador procedural de esferas
-- `triangle.rs`: Rasterización con shaders planetarios
-- `shaders.rs`: Vertex shaders y transformaciones
-- `framebuffer.rs`: Buffer de píxeles y z-buffer
+```
+spaceship/
+├── src/
+│   ├── main.rs          # Loop principal y sistema de cámara
+│   ├── planets.rs       # Shaders planetarios de 4 capas
+│   ├── sphere.rs        # Generación procedural de esferas
+│   ├── triangle.rs      # Rasterización con culling mejorado
+│   ├── shaders.rs       # Vertex shaders y transformaciones MVP
+│   ├── framebuffer.rs   # Buffer de píxeles con Z-buffer
+│   ├── skybox.rs        # Generación procedural de estrellas
+│   ├── line.rs          # Renderizado de líneas (órbitas)
+│   ├── obj.rs           # Carga de modelos 3D
+│   ├── vertex.rs        # Estructura de vértices
+│   ├── fragment.rs      # Estructura de fragmentos
+│   └── color.rs         # Utilidades de color
+└── assets/
+    ├── Spaceship.obj    # Modelo 3D de la nave
+    └── images/          # Capturas de pantalla
+```
 
-### **Pipeline de Renderizado**
+### **Pipeline de Renderizado 3D**
 
-1. **Vertex Shader**: Transformaciones matriciales 3D
-2. **Primitive Assembly**: Agrupación en triángulos
-3. **Rasterización**: Coordenadas baricéntricas
-4. **Fragment Shaders**: Shaders planetarios de 4 capas
-5. **Z-Buffer**: Manejo de profundidad y oclusión
+1. **Transformaciones de Modelo**: Rotación, escala, traslación
+2. **Vertex Shader**: MVP (Model-View-Projection) transformation
+3. **Clipping**: Rechazo de geometría fuera del frustum
+4. **Rasterización**: Conversión de triángulos a píxeles
+5. **Fragment Shaders**: Shaders planetarios procedurales de 4 capas
+6. **Z-Buffer**: Manejo de profundidad y oclusión
+7. **Framebuffer**: Salida final a pantalla
+
+### **Optimizaciones Implementadas**
+
+- **Frustum Culling**: Rechazo de vértices fuera de la vista
+- **Back-face Culling**: Eliminación de triángulos no visibles
+- **Z-Buffer**: Ordenamiento correcto de profundidad
+- **Bounding Box Clipping**: Límites de rasterización
+- **Triangle Rejection**: Rechazo de triángulos degenerados
+- **Near Plane Adjustment**: near=1.0 para evitar artefactos visuales
 
 ### **Técnicas Avanzadas**
 
-- **Shaders procedurales**: Sin texturas, solo matemáticas
-- **Generación procedural de esferas**: Coordenadas esféricas
-- **Sistemas de anillos**: Geometría toroidal con espaciado
-- **Interpolación baricéntrica**: Para normales y coordenadas UV
-- **Animación temporal**: Parámetro time en todos los shaders
+- **Cámara Third-Person**: Posicionamiento dinámico detrás de la nave
+- **Sistema de Colisiones**: Detección esférica con margen de seguridad
+- **Shaders Procedurales**: Sin texturas, solo matemáticas
+- **Skybox Procedural**: Generador pseudo-aleatorio de estrellas
+- **Orbital Rendering**: Líneas de órbita con transformación MVP
+- **Modelo 3D Correction**: Ajuste de orientación del modelo Spaceship.obj
 
 ## 📋 Requisitos del Sistema
 
@@ -135,65 +154,113 @@ tobj = "4.0"            # Carga de archivos OBJ (para futura nave espacial)
 
 ```bash
 # Clonar el repositorio
-git clone https://github.com/FerAHMz/spaceship_proy3.git
-cd spaceship_proy3/spaceship
+git clone https://github.com/FerAHMz/graficas_proy3.git
+cd graficas_proy3/spaceship
 
-# Compilar en modo release para mejor performance
+# Compilar en modo release (recomendado para mejor performance)
 cargo build --release
 
-# Ejecutar el sistema solar
+# Ejecutar el sistema solar con nave espacial
 cargo run --release
 ```
 
-## 🎮 Guía de Uso
+### **Requisitos del Sistema**
 
-### **Navegación del Sistema Solar**
+- Rust 1.70 o superior
+- Cargo (incluido con Rust)
+- Sistema operativo: Windows/Linux/macOS
 
-1. **Ejecuta el programa** - Se mostrará el sistema solar completo
-2. **Usa las teclas 1-6** para enfocar planetas específicos:
+### **Dependencias**
 
-   - `1` - Sol (Estrella con efectos de fuego)
-   - `2` - Planeta Rocoso (con su luna orbital)
-   - `3` - Gigante Gaseoso (con sistema de anillos)
-   - `4` - Planeta Helado (mundo congelado)
-   - `5` - Planeta Volcánico (mundo de lava)
-   - `6` - Planeta Anillado (tipo Saturno)
+```toml
+[dependencies]
+minifb = "0.26"           # Ventana y framebuffer
+nalgebra-glm = "0.18"     # Matemáticas vectoriales y matriciales
+tobj = "4.0"              # Carga de archivos OBJ
+```
 
-3. **Controles de cámara**:
-   - `Flechas` - Mover cámara libremente
-   - `S/A` - Zoom in/out para ver detalles
-   - `SPACE` - Activar/desactivar rotación automática
+## 🎯 Detalles de Implementación
 
-### **Características Especiales**
+### **Sistema de Colisiones**
 
-- **Sistema de anillos visible** en planetas 3 y 6
-- **Luna orbital** alrededor del planeta rocoso (planeta 2)
-- **Animaciones en tiempo real** en todos los shaders
-- **Espaciado realista** entre anillos y planetas
+```rust
+impl Spaceship {
+    fn check_collision(&self, planet_pos: Vec3, planet_radius: f32) -> bool {
+        let distance = (self.position - planet_pos).magnitude();
+        let spaceship_radius = 1.5;
+        let safety_margin = 1.0;
+        distance < (planet_radius + spaceship_radius + safety_margin)
+    }
+}
+```
 
-## 🏆 Logros del Proyecto
+- Radio de la nave: 1.5 unidades
+- Margen de seguridad: 1.0 unidades
+- Detección esférica simple pero efectiva
 
-### **Creatividad Visual**
+### **Cámara en Tercera Persona**
 
-- Cada planeta tiene una **identidad visual única**
-- **Shaders procedurales complejos** sin usar texturas
-- **Animaciones fluidas** y efectos dinámicos
-- **Sistema completo** que simula un universo en miniatura
+```rust
+let camera_distance = 2.5;
+let camera_height = 0.8;
+let yaw = spaceship.rotation.y;
 
-### **Excelencia Técnica**
+let camera_position = Vec3::new(
+    spaceship.position.x - yaw.sin() * camera_distance,
+    spaceship.position.y + camera_height,
+    spaceship.position.z - yaw.cos() * camera_distance
+);
+```
 
-- **Pipeline de renderizado completo** implementado desde cero
-- **Optimizaciones de performance** con z-buffer y bounding boxes
-- **Código modular y extensible** para futuras mejoras
-- **Documentación completa** y comentarios explicativos
+- Sigue automáticamente la rotación de la nave
+- Distancia fija para vista consistente
+- Elevación para mejor perspectiva
 
-### **Cumplimiento de Requisitos**
+### **Renderizado de Órbitas**
 
-- ✅ **3 planetas base** + **3 planetas EXTRAS** = 6 planetas únicos
-- ✅ **Shaders de 4 capas** en todos los planetas
-- ✅ **Sistema de anillos** implementado correctamente
-- ✅ **Luna orbital** funcionando perfectamente
-- ✅ **Sin texturas ni materiales** - solo shaders matemáticos
+```rust
+fn draw_orbit(
+    framebuffer: &mut Framebuffer,
+    center: Vec3,
+    radius: f32,
+    segments: u32,
+    color: Color,
+    // ... matrices de transformación
+)
+```
+
+- 4 órbitas con diferentes radios y colores
+- 100-160 segmentos por órbita para suavidad
+- Transformación MVP completa
+- Clipping para evitar artefactos
+
+## 🏆 Características Destacadas
+
+### **Shaders Planetarios de 4 Capas**
+
+Cada planeta tiene un shader único con 4 capas de detalle:
+
+1. **Sol**: Núcleo → Plasma → Llamaradas → Corona
+2. **Planeta Rocoso**: Continentes → Océanos → Nubes → Hielo polar
+3. **Gigante Gaseoso**: Bandas → Tormentas → Gran mancha → Turbulencia
+4. **Planeta de Hielo**: Cristales → Grietas → Aurora → Escarcha
+5. **Planeta Volcánico**: Lava → Roca → Erupciones → Ceniza
+6. **Planeta Anillado**: Bandas → Tormenta polar → Vientos → Atmósfera
+
+### **Skybox Procedural**
+
+- Generador pseudo-aleatorio determinista
+- 800 estrellas distribuidas uniformemente
+- 4 niveles de brillo (100, 150, 200, 255)
+- Estrellas brillantes con halo de 5 píxeles
+- Sin imágenes, completamente procedural
+
+### **Sistema de Anillos**
+
+- Múltiples anillos por planeta (3 anillos por sistema)
+- Espaciado realista entre anillos
+- Inclinación correcta (PI/6 radianes)
+- Renderizado con shader específico
 
 ## 🔮 Futuras Mejoras
 
